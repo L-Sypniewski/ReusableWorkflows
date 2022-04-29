@@ -1,0 +1,83 @@
+name: Terraform plan and PR comments
+on:
+  workflow_call:
+    inputs:
+      STATE_FILENAME:
+        required: true
+        type: string
+      SCRIPT_TO_RUN_BEFORE_INIT:
+        required: false
+        type: string
+    secrets:
+      ENV_VARIABLES:
+        required: false
+jobs:
+  terraform-plan-and-add-pr-comments:
+    name: Terraform plan and add PR comments
+    runs-on: ubuntu-latest
+    env:
+      tf_actions_working_dir: "terraform"
+      tfcmt_version: "3.2.1"
+      github_comment_version: "4.1.1"
+    defaults:
+      run:
+        working-directory: ${{ env.tf_actions_working_dir }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+      - name: Setup environmental variables
+        run: |
+          STATE_FILENAME="$([ -n "${{ github.event.inputs.STATE_FILENAME }}" ] && echo ${{ github.event.inputs.STATE_FILENAME }} || echo ${{ inputs.STATE_FILENAME }})"
+          SCRIPT_TO_RUN_BEFORE_INIT="$([ -n "${{ github.event.inputs.SCRIPT_TO_RUN_BEFORE_INIT }}" ] && echo ${{ github.event.inputs.SCRIPT_TO_RUN_BEFORE_INIT }} || echo ${{ inputs.SCRIPT_TO_RUN_BEFORE_INIT }})"
+          echo state_filename=$STATE_FILENAME >> $GITHUB_ENV    
+          echo script_to_run_before_init=$SCRIPT_TO_RUN_BEFORE_INIT >> $GITHUB_ENV
+      - name: Download tfcmt
+        run: |
+          mkdir tfcmt && cd tfcmt
+          wget https://github.com/suzuki-shunsuke/tfcmt/releases/download/v${{ env.tfcmt_version }}/tfcmt_linux_amd64.tar.gz
+          tar -xvf tfcmt_linux_amd64.tar.gz
+      - name: Download github-comment
+        if: ${{ !env.ACT }}
+        run: |
+          mkdir github-comment && cd github-comment
+          wget https://github.com/suzuki-shunsuke/github-comment/releases/download/v${{ env.github_comment_version }}/github-comment_${{ env.github_comment_version }}_linux_amd64.tar.gz
+          tar -xvf github-comment_${{ env.github_comment_version }}_linux_amd64.tar.gz
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v2
+        env:
+          DOTNET_NOLOGO: true
+          DOTNET_CLI_TELEMETRY_OPTOUT: true
+        with:
+          dotnet-version: "6.x.x"
+      - name: Run script
+        if: "${{ env.script_to_run_before_init != '' }}"
+        run: |
+          eval "${{ env.script_to_run_before_init }}"
+      - uses: hashicorp/setup-terraform@v2
+        name: Setup Terraform
+        with:
+          terraform_version: 1.1.9
+      - name: Terraform fmt
+        id: fmt
+        run: terraform fmt -check
+        continue-on-error: true
+      - name: Terraform Init
+        id: init
+        run: |
+          export $(echo ${{ secrets.ENV_VARIABLES }} | grep -v '^#' | xargs -d '\n')
+          terraform init -backend-config=key="${{ env.state_filename }}" -input=false
+      - name: Terraform Validate
+        id: validate
+        run: terraform validate -no-color
+      - name: Remove old tfcmt comments
+        if: ${{ !env.ACT }}
+        run: |
+          export GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}
+          ./github-comment/github-comment hide
+      - name: Terraform Plan
+        id: plan
+        run: |
+          export GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}
+          export $(echo ${{ secrets.ENV_VARIABLES }} | grep -v '^#' | xargs -d '\n')
+          ./tfcmt/tfcmt plan -- terraform plan -input=false
+        continue-on-error: true
