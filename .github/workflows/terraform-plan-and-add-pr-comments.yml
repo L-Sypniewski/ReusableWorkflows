@@ -65,7 +65,7 @@ jobs:
         id: init
         run: |
           export $(echo ${{ secrets.ENV_VARIABLES }} | grep -v '^#' | xargs -d '\n')
-          terraform init -backend-config=key="${{ env.state_filename }}" -input=false
+          terraform init -upgrade -backend-config=key="${{ env.state_filename }}" -input=false
       - name: Terraform Validate
         id: validate
         run: terraform validate -no-color
