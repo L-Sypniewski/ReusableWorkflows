@@ -62,7 +62,6 @@ jobs:
       - name: Terraform fmt
         id: fmt
         run: terraform fmt -check
-        continue-on-error: true
       - name: Terraform Init
         id: init
         run: |
@@ -82,10 +81,9 @@ jobs:
           export GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}
           export $(echo ${{ secrets.ENV_VARIABLES }} | grep -v '^#' | xargs -d '\n')
           ./tfcmt/tfcmt plan -- terraform plan -out=plan.tf -input=false
-        continue-on-error: true
       - name: Terraform apply refresh-only plan
         if: "${{ inputs.apply_refresh_only_plan == true }}"
         id: apply-refresh
         run: |
+          export $(echo ${{ secrets.ENV_VARIABLES }} | grep -v '^#' | xargs -d '\n')
           terraform apply -refresh-only plan.tf
-        continue-on-error: true
