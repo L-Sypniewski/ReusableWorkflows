@@ -2,18 +2,21 @@ name: Terraform plan and PR comments
 on:
   workflow_call:
     inputs:
-      STATE_FILENAME:
+      state_filename:
         required: true
         type: string
-      SCRIPT_TO_RUN_BEFORE_INIT:
+      script_to_run_before_init:
         required: false
         type: string
       apply_refresh_only_plan:
         required: false
         default: false
         type: boolean
+      env_variables:
+        type: string
+        required: false
     secrets:
-      ENV_VARIABLES:
+      env_secrets:
         required: false
 jobs:
   terraform-plan-and-add-pr-comments:
@@ -31,8 +34,8 @@ jobs:
         uses: actions/checkout@v3
       - name: Setup environmental variables
         run: |
-          SCRIPT_TO_RUN_BEFORE_INIT="$([ -n "${{ github.event.inputs.SCRIPT_TO_RUN_BEFORE_INIT }}" ] && echo ${{ github.event.inputs.SCRIPT_TO_RUN_BEFORE_INIT }} || echo ${{ inputs.SCRIPT_TO_RUN_BEFORE_INIT }})"
-          echo script_to_run_before_init=$SCRIPT_TO_RUN_BEFORE_INIT >> $GITHUB_ENV
+          script_to_run_before_init="$([ -n "${{ github.event.inputs.script_to_run_before_init }}" ] && echo ${{ github.event.inputs.script_to_run_before_init }} || echo ${{ inputs.script_to_run_before_init }})"
+          echo script_to_run_before_init=$script_to_run_before_init >> $GITHUB_ENV
       - name: Download tfcmt
         run: |
           mkdir tfcmt && cd tfcmt
@@ -52,9 +55,9 @@ jobs:
         with:
           dotnet-version: "6.x.x"
       - name: Run script
-        if: "${{ inputs.SCRIPT_TO_RUN_BEFORE_INIT != '' }}"
+        if: "${{ inputs.script_to_run_before_init != '' }}"
         run: |
-          eval "${{ inputs.SCRIPT_TO_RUN_BEFORE_INIT }}"
+          eval "${{ inputs.script_to_run_before_init }}"
       - uses: hashicorp/setup-terraform@v2
         name: Setup Terraform
         with:
@@ -65,8 +68,9 @@ jobs:
       - name: Terraform Init
         id: init
         run: |
-          export $(echo ${{ secrets.ENV_VARIABLES }} | grep -v '^#' | xargs -d '\n')
-          terraform init -upgrade -backend-config=key="${{ inputs.STATE_FILENAME }}" -input=false
+          export $(echo ${{ inputs.env_variables }} | grep -v '^#' | xargs -d '\n')
+          export $(echo ${{ secrets.env_secrets }} | grep -v '^#' | xargs -d '\n')
+          terraform init -upgrade -backend-config=key="${{ inputs.state_filename }}" -input=false
       - name: Terraform Validate
         id: validate
         run: terraform validate -no-color
@@ -79,11 +83,13 @@ jobs:
         id: plan
         run: |
           export GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}
-          export $(echo ${{ secrets.ENV_VARIABLES }} | grep -v '^#' | xargs -d '\n')
+          export $(echo ${{ inputs.env_variables }} | grep -v '^#' | xargs -d '\n')
+          export $(echo ${{ secrets.env_secrets }} | grep -v '^#' | xargs -d '\n')
           ./tfcmt/tfcmt plan -- terraform plan -out=plan.tf -input=false
       - name: Terraform apply refresh-only plan
         if: "${{ inputs.apply_refresh_only_plan == true }}"
         id: apply-refresh
         run: |
-          export $(echo ${{ secrets.ENV_VARIABLES }} | grep -v '^#' | xargs -d '\n')
+          export $(echo ${{ inputs.env_variables }} | grep -v '^#' | xargs -d '\n')
+          export $(echo ${{ secrets.env_secrets }} | grep -v '^#' | xargs -d '\n')
           terraform apply -refresh-only plan.tf
