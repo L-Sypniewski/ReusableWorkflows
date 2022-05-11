@@ -36,15 +36,28 @@ jobs:
         run: |
           script_to_run_before_init="$([ -n "${{ github.event.inputs.script_to_run_before_init }}" ] && echo ${{ github.event.inputs.script_to_run_before_init }} || echo ${{ inputs.script_to_run_before_init }})"
           echo script_to_run_before_init=$script_to_run_before_init >> $GITHUB_ENV
+      - name: Cache tfcmt
+        id: cache-tfcmt
+        uses: actions/cache@v3
+        with:
+          path: ~/tfcmt
+          key: ${{ env.tfcmt_version }}-tfcmt
       - name: Download tfcmt
+        if: steps.cache-tfcmt.outputs.cache-hit != 'true'
         run: |
-          mkdir tfcmt && cd tfcmt
-          wget https://github.com/suzuki-shunsuke/tfcmt/releases/download/v${{ env.tfcmt_version }}/tfcmt_linux_amd64.tar.gz
-          tar -xvf tfcmt_linux_amd64.tar.gz
+            mkdir ~/tfcmt && cd ~/tfcmt
+            wget https://github.com/suzuki-shunsuke/tfcmt/releases/download/v${{ env.tfcmt_version }}/tfcmt_linux_amd64.tar.gz
+            tar -xvf tfcmt_linux_amd64.tar.gz
+      - name: Cache github-comment
+        id: cache-github-comment
+        uses: actions/cache@v3
+        with:
+          path: ~/github-comment
+          key: ${{ env.github_comment_version }}-github-comment
       - name: Download github-comment
-        if: ${{ !env.ACT }}
+        if: steps.cache-github-comment.outputs.cache-hit != 'true'
         run: |
-          mkdir github-comment && cd github-comment
+          mkdir ~/github-comment && cd ~/github-comment
           wget https://github.com/suzuki-shunsuke/github-comment/releases/download/v${{ env.github_comment_version }}/github-comment_${{ env.github_comment_version }}_linux_amd64.tar.gz
           tar -xvf github-comment_${{ env.github_comment_version }}_linux_amd64.tar.gz
       - name: Setup .NET
@@ -75,17 +88,16 @@ jobs:
         id: validate
         run: terraform validate -no-color
       - name: Remove old tfcmt comments
-        if: ${{ !env.ACT }}
         run: |
           export GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}
-          ./github-comment/github-comment hide
+          ~/github-comment/github-comment hide
       - name: Terraform Plan
         id: plan
         run: |
           export GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}
           export $(echo ${{ inputs.env_variables }} | grep -v '^#' | xargs -d '\n')
           export $(echo ${{ secrets.env_secrets }} | grep -v '^#' | xargs -d '\n')
-          ./tfcmt/tfcmt plan -- terraform plan -out=plan.tf -input=false
+          ~/tfcmt/tfcmt plan -- terraform plan -out=plan.tf -input=false
       - name: Terraform apply refresh-only plan
         if: "${{ inputs.apply_refresh_only_plan == true }}"
         id: apply-refresh
