@@ -8,10 +8,6 @@ on:
       script_to_run_before_init:
         required: false
         type: string
-      apply_refresh_only_plan:
-        required: false
-        default: false
-        type: boolean
       env_variables:
         type: string
         required: false
@@ -98,10 +94,3 @@ jobs:
           export $(echo ${{ inputs.env_variables }} | grep -v '^#' | xargs -d '\n')
           export $(echo ${{ secrets.env_secrets }} | grep -v '^#' | xargs -d '\n')
           ~/tfcmt/tfcmt plan -- terraform plan -out=plan.tf -input=false
-      - name: Terraform apply refresh-only plan
-        if: "${{ inputs.apply_refresh_only_plan == true }}"
-        id: apply-refresh
-        run: |
-          export $(echo ${{ inputs.env_variables }} | grep -v '^#' | xargs -d '\n')
-          export $(echo ${{ secrets.env_secrets }} | grep -v '^#' | xargs -d '\n')
-          terraform apply -refresh-only plan.tf
