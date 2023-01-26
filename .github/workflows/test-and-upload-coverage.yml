@@ -89,4 +89,4 @@ jobs:
 
             reportgenerator -reports:"./**/coverage.cobertura.xml" -targetdir:"./coverage" -reporttypes:"lcov"  
 
-            ./codeclimate-test-reporter after-build --debug -t lcov --exit-code $?
+            ./codeclimate-test-reporter after-build -t lcov --exit-code $?
