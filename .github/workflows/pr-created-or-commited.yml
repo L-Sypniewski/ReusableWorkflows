@@ -1,0 +1,91 @@
+name: Run tests on PR creation or when commited to the PR
+on:
+  workflow_dispatch:
+    inputs:
+      dotnet_version:
+        description: "Dotnet version used for setup-dotnet action"
+        required: true
+        type: string
+      code_climate_reporter_id:
+        description: "CodeClimate reporter ID"
+        required: true
+        type: string
+      code_climate_test_reporter_version:
+        description: "Version of CodeClimate's test reporter to be used for uploading coverage data"
+        required: false
+        type: string
+        default: latest
+      test_project:
+        description: "Relative path to the .sln or .csproj file, used as a parameter for 'dotnet test' command"
+        required: false
+        type: string
+  workflow_call:
+    inputs:
+      dotnet_version:
+        description: "Dotnet version used for setup-dotnet action"
+        required: true
+        type: string
+      code_climate_reporter_id:
+        description: "CodeClimate reporter ID"
+        required: true
+        type: string
+      code_climate_test_reporter_version:
+        description: "Version of CodeClimate's test reporter to be used for uploading coverage data"
+        required: false
+        type: string
+        default: latest
+      test_project:
+        description: "Relative path to the .sln or .csproj file, used as a parameter for 'dotnet test' command"
+        required: false
+        type: string
+permissions:
+  contents: write
+  packages: write
+jobs:
+  run-tests:
+    if: github.event.pull_request.merged == true || github.event.pull_request.state != 'closed'
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: ${{ inputs.dotnet_version }}
+          dotnet-quality: "ga"
+      - name: Checkout repository
+        uses: actions/checkout@v3
+      - name: Set ENV for codeclimate (pull_request)
+        if: github.event_name == 'pull_request'
+        # Needed as: When the action is triggered by a pull_request event, GitHub will squash and merge this branch with the base branch, generating a new commit, thus a new hash.
+        run: |
+          git fetch --no-tags --prune --depth=1 origin +refs/heads/$GITHUB_HEAD_REF:refs/remotes/origin/$GITHUB_HEAD_REF
+          echo "GIT_BRANCH=$GITHUB_HEAD_REF" >> $GITHUB_ENV
+          echo "GIT_COMMIT_SHA=$(git rev-parse origin/$GITHUB_HEAD_REF)" >> $GITHUB_ENV
+      - name: Set ENV for codeclimate (push)
+        if: github.event_name == 'push'
+        run: |
+          echo "GIT_BRANCH=$GITHUB_HEAD_REF" >> $GITHUB_ENV
+          echo "GIT_COMMIT_SHA=$GIT_COMMIT_SHA" >> $GITHUB_ENV
+      - name: Set ENV for codeclimate (workflow dispatch)
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          echo "GIT_BRANCH=$GITHUB_REF_NAME" >> $GITHUB_ENV
+          echo "GIT_COMMIT_SHA=$GIT_COMMIT_SHA" >> $GITHUB_ENV
+      - name: Run tests
+        env:
+          CC_TEST_REPORTER_ID: ${{ inputs.code_climate_reporter_id }}
+        run: |
+            # Download codeclimate test reporter
+            curl -L "https://codeclimate.com/downloads/test-reporter/test-reporter-${{ code_climate_test_reporter_version }}-linux-amd64" > ./codeclimate-test-reporter
+            chmod +x ./codeclimate-test-reporter
+
+            # Install dotnet tools to merge coverage files
+            dotnet tool install -g dotnet-reportgenerator-globaltool
+
+            # Start codeclimate process
+            ./codeclimate-test-reporter before-build
+
+            # Build solution
+            dotnet test ${{ inputs.test_project }} --collect:"XPlat Code Coverage" --settings runsettings.xml
+
+            reportgenerator -reports:"./**/coverage.cobertura.xml" -targetdir:"./coverage" -reporttypes:"lcov"  
+
+            ./codeclimate-test-reporter after-build --debug -t lcov --exit-code $?
