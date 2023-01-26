@@ -16,7 +16,7 @@ on:
         type: string
         default: latest
       test_project:
-        description: "Relative path to the .sln or .csproj file, used as a parameter for 'dotnet test' command"
+        description: "Relative path to the .sln or .csproj file, used as a parameter for 'dotnet test' command. Not needed if .sln or .csproj file is in the root folder of a repository"
         required: false
         type: string
   workflow_call:
@@ -35,7 +35,7 @@ on:
         type: string
         default: latest
       test_project:
-        description: "Relative path to the .sln or .csproj file, used as a parameter for 'dotnet test' command"
+        description: "Relative path to the .sln or .csproj file, used as a parameter for 'dotnet test' command. Not needed if .sln or .csproj file is in the root folder of a repository"
         required: false
         type: string
 permissions:
@@ -43,6 +43,7 @@ permissions:
   packages: write
 jobs:
   run-tests:
+    name: "Run tests and upload coverage to CodeClimate"
     if: github.event.pull_request.merged == true || github.event.pull_request.state != 'closed'
     runs-on: ubuntu-22.04
     steps:
@@ -69,12 +70,12 @@ jobs:
         run: |
           echo "GIT_BRANCH=$GITHUB_REF_NAME" >> $GITHUB_ENV
           echo "GIT_COMMIT_SHA=$GIT_COMMIT_SHA" >> $GITHUB_ENV
-      - name: Run tests
+      - name: Run tests and upload coverage
         env:
           CC_TEST_REPORTER_ID: ${{ inputs.code_climate_reporter_id }}
         run: |
             # Download codeclimate test reporter
-            curl -L "https://codeclimate.com/downloads/test-reporter/test-reporter-${{ code_climate_test_reporter_version }}-linux-amd64" > ./codeclimate-test-reporter
+            curl -L "https://codeclimate.com/downloads/test-reporter/test-reporter-${{ inputs.code_climate_test_reporter_version }}-linux-amd64" > ./codeclimate-test-reporter
             chmod +x ./codeclimate-test-reporter
 
             # Install dotnet tools to merge coverage files
