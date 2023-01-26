@@ -54,14 +54,14 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
       - name: Set ENV for codeclimate (pull_request)
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' && github.event.pull_request.merged == false
         # Needed as: When the action is triggered by a pull_request event, GitHub will squash and merge this branch with the base branch, generating a new commit, thus a new hash.
         run: |
           git fetch --no-tags --prune --depth=1 origin +refs/heads/$GITHUB_HEAD_REF:refs/remotes/origin/$GITHUB_HEAD_REF
           echo "GIT_BRANCH=$GITHUB_HEAD_REF" >> $GITHUB_ENV
           echo "GIT_COMMIT_SHA=$(git rev-parse origin/$GITHUB_HEAD_REF)" >> $GITHUB_ENV
       - name: Set ENV for codeclimate (push)
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
         run: |
           echo "GIT_BRANCH=$GITHUB_HEAD_REF" >> $GITHUB_ENV
           echo "GIT_COMMIT_SHA=$GIT_COMMIT_SHA" >> $GITHUB_ENV
