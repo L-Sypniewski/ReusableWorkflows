@@ -19,6 +19,11 @@ on:
         description: "Relative path to the .sln or .csproj file, used as a parameter for 'dotnet test' command. Not needed if .sln or .csproj file is in the root folder of a repository"
         required: false
         type: string
+      treat_warnings_as_errors:
+        description: "If true 'dotnet build' command fails should there are be any errors"
+        required: false
+        default: false
+        type: boolean
   workflow_call:
     inputs:
       dotnet_version:
@@ -38,6 +43,11 @@ on:
         description: "Relative path to the .sln or .csproj file, used as a parameter for 'dotnet test' command. Not needed if .sln or .csproj file is in the root folder of a repository"
         required: false
         type: string
+      treat_warnings_as_errors:
+        description: "If true 'dotnet build' command fails should there are be any errors"
+        required: false
+        default: false
+        type: boolean
 permissions:
   contents: write
   packages: write
@@ -85,6 +95,7 @@ jobs:
             ./codeclimate-test-reporter before-build
 
             # Build solution
+            dotnet build /p:TreatWarningsAsErrors="${{ inputs.treat_warnings_as_errors }}"
             dotnet test ${{ inputs.test_project }} --collect:"XPlat Code Coverage" --settings runsettings.xml
 
             reportgenerator -reports:"./**/coverage.cobertura.xml" -targetdir:"./coverage" -reporttypes:"lcov"  
