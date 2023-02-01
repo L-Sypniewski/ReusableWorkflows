@@ -51,18 +51,37 @@ on:
 permissions:
   contents: write
   packages: write
+  pull-requests: write
 jobs:
+  reviewdog:
+    name: Lint code with reviewdog
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+      - uses: reviewdog/action-setup@v1
+        id: setup-reviewdog
+        if: github.event.pull_request.state != 'closed'
+        with:
+          reviewdog_version: v0.14.1
+      - name: Run reviewdog
+        if: steps.setup-reviewdog.outcome != 'skipped'
+        env:
+          REVIEWDOG_GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # msbuild is used to avoid duplicated errors - summary is not displayed: https://stackoverflow.com/a/44780004/8297552
+          dotnet msbuild | reviewdog -f=dotnet -reporter=github-pr-review -level warning -fail-on-error
   run-tests:
     name: "Run tests and upload coverage to CodeClimate"
     if: github.event.pull_request.merged == true || github.event.pull_request.state != 'closed'
     runs-on: ubuntu-22.04
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
       - uses: actions/setup-dotnet@v3
         with:
           dotnet-version: ${{ inputs.dotnet_version }}
           dotnet-quality: "ga"
-      - name: Checkout repository
-        uses: actions/checkout@v3
       - name: Set ENV for codeclimate (pull_request)
         if: github.event_name == 'pull_request' && github.event.pull_request.merged == false
         # Needed as: When the action is triggered by a pull_request event, GitHub will squash and merge this branch with the base branch, generating a new commit, thus a new hash.
@@ -84,20 +103,20 @@ jobs:
         env:
           CC_TEST_REPORTER_ID: ${{ inputs.code_climate_reporter_id }}
         run: |
-            # Download codeclimate test reporter
-            curl -L "https://codeclimate.com/downloads/test-reporter/test-reporter-${{ inputs.code_climate_test_reporter_version }}-linux-amd64" > ./codeclimate-test-reporter
-            chmod +x ./codeclimate-test-reporter
+          # Download codeclimate test reporter
+          curl -L "https://codeclimate.com/downloads/test-reporter/test-reporter-${{ inputs.code_climate_test_reporter_version }}-linux-amd64" > ./codeclimate-test-reporter
+          chmod +x ./codeclimate-test-reporter
 
-            # Install dotnet tools to merge coverage files
-            dotnet tool install -g dotnet-reportgenerator-globaltool
+          # Install dotnet tools to merge coverage files
+          dotnet tool install -g dotnet-reportgenerator-globaltool
 
-            # Start codeclimate process
-            ./codeclimate-test-reporter before-build
+          # Start codeclimate process
+          ./codeclimate-test-reporter before-build
 
-            # Build solution
-            dotnet build /p:TreatWarningsAsErrors="${{ inputs.treat_warnings_as_errors }}"
-            dotnet test ${{ inputs.test_project }} --collect:"XPlat Code Coverage" --settings runsettings.xml
+          # Build solution
+          dotnet build /p:TreatWarningsAsErrors="${{ inputs.treat_warnings_as_errors }}"
+          dotnet test ${{ inputs.test_project }} --collect:"XPlat Code Coverage" --settings runsettings.xml
 
-            reportgenerator -reports:"./**/coverage.cobertura.xml" -targetdir:"./coverage" -reporttypes:"lcov"  
+          reportgenerator -reports:"./**/coverage.cobertura.xml" -targetdir:"./coverage" -reporttypes:"lcov"  
 
-            ./codeclimate-test-reporter after-build -t lcov --exit-code $?
+          ./codeclimate-test-reporter after-build -t lcov --exit-code $?
