@@ -76,12 +76,6 @@ jobs:
     if: github.event.pull_request.merged == true || github.event.pull_request.state != 'closed'
     runs-on: ubuntu-22.04
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
-      - uses: actions/setup-dotnet@v3
-        with:
-          dotnet-version: ${{ inputs.dotnet_version }}
-          dotnet-quality: "ga"
       - name: Set ENV for codeclimate (pull_request)
         if: github.event_name == 'pull_request' && github.event.pull_request.merged == false
         # Needed as: When the action is triggered by a pull_request event, GitHub will squash and merge this branch with the base branch, generating a new commit, thus a new hash.

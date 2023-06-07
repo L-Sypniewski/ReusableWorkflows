@@ -1,0 +1,40 @@
+name: Reviewdog - lint
+description: Formats .NET code and pushes the changes
+inputs:
+  reviewdog_version:
+    description: "Reviewdog version"
+    required: true
+  dotnet_build_flags:
+    description: "Flags appended to dotnet build command"
+    required: false
+  reporter:
+    description: "Reporter type"
+    required: true
+  level:
+    description: "Level (info, warning, error)"
+    required: false
+    default: "error"
+  project_relative_path:
+    description: "Relative path to the .sln or .csproj file, used as a parameter for 'dotnet test' command. Not needed if .sln or .csproj file is in the root folder of a repository"
+    required: false
+  github_token:
+    description: "GitHub token used by reviewdog"
+    required: true
+runs:
+  using: "composite"
+  steps:
+    - if: github.event.pull_request.state != 'closed'
+      uses: reviewdog/action-setup@v1
+      id: setup-reviewdog
+      name: Setup reviewdog
+      with:
+        reviewdog_version: ${{ inputs.reviewdog_version }}
+    - name: Run reviewdog for .NET project
+      shell: bash
+      if: steps.setup-reviewdog.outcome != 'skipped'
+      env:
+        REVIEWDOG_GITHUB_API_TOKEN: ${{ inputs.github_token }}
+      run: |
+        # msbuild is used to avoid duplicated errors - summary is not displayed: https://stackoverflow.com/a/44780004/8297552
+        dotnet restore
+        dotnet msbuild ${{ inputs.project_relative_path }} ${{ inputs.dotnet_build_flags }} | reviewdog -f=dotnet -reporter=${{ inputs.reporter }} -level=${{ inputs.level }}

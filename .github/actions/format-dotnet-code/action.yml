@@ -1,0 +1,28 @@
+name: Format .NET code
+description: Formats .NET code and pushes the changes
+inputs:
+  project_relative_path:
+    description: "Relative path to a project/solution file that is to be formatted, for example './MyApp.csproj'"
+    required: false
+  ignore_commit_hooks:
+    description: "If true '--no-verify' flag is added to 'git commit' command. True by default"
+    required: false
+    default: "true"
+runs:
+  using: "composite"
+  steps:
+    - name: Setup @actions user as a git user
+      shell: bash
+      run: |
+        git config user.name "GitHub Actions"
+        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+    - name: Run dotnet format
+      shell: bash
+      run: dotnet format ${{ inputs.project_relative_path }}
+    - name: Commit and push formatted code
+      shell: bash
+      run: |
+        no_verify=$([ ${{ inputs.ignore_commit_hooks == 'true' }} ] && echo "--no-verify")
+        git add .
+        git diff-index --quiet HEAD || git commit -m "ci: Code formatting" "$no_verify"
+        git push
