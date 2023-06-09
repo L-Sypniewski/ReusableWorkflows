@@ -8,7 +8,7 @@ inputs:
     description: "Version of CodeClimate's test reporter to be used for uploading coverage data"
     required: false
     default: latest
-  test_project:
+  project_relative_path:
     description: "Relative path to the .sln or .csproj file, used as a parameter for 'dotnet test' command. Not needed if .sln or .csproj file is in the root folder of a repository"
     required: false
   treat_warnings_as_errors:
@@ -55,7 +55,7 @@ runs:
 
           # Build solution
           dotnet build /p:TreatWarningsAsErrors="${{ inputs.treat_warnings_as_errors }}"
-          dotnet test ${{ inputs.test_project }} --collect:"XPlat Code Coverage" --settings runsettings.xml
+          dotnet test ${{ inputs.project_relative_path }} --collect:"XPlat Code Coverage" --settings runsettings.xml
 
           reportgenerator -reports:"./**/coverage.cobertura.xml" -targetdir:"./coverage" -reporttypes:"lcov"  
 
