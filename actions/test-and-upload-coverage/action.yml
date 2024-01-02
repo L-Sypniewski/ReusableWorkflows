@@ -53,6 +53,6 @@ runs:
         dotnet build
         dotnet test ${{ inputs.project_relative_path }} --collect:"XPlat Code Coverage" --settings runsettings.xml
 
-        reportgenerator -reports:"./**/coverage.cobertura.xml" -targetdir:"./coverage" -reporttypes:"lcov"  
+        reportgenerator -reports:"./**/coverage.cobertura.xml" -targetdir:"./coverage" -reporttypes:"lcov" -filefilters:'-**/*.g.cs'   
 
         ./codeclimate-test-reporter after-build -t lcov --exit-code $?
