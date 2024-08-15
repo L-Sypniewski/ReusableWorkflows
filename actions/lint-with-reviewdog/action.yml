@@ -36,5 +36,5 @@ runs:
         REVIEWDOG_GITHUB_API_TOKEN: ${{ inputs.github_token }}
       run: |
         # msbuild is used to avoid duplicated errors - summary is not displayed: https://stackoverflow.com/a/44780004/8297552
-        dotnet restore
+        dotnet restore ${{ inputs.project_relative_path }}
         dotnet msbuild ${{ inputs.project_relative_path }} ${{ inputs.dotnet_build_flags }} | reviewdog -f=dotnet -reporter=${{ inputs.reporter }} -level=${{ inputs.level }}
